@@ -1,0 +1,23 @@
+# --- Cursor / VS Code ---
+.vscode/
+.cursor/
+*.code-workspace
+
+# --- WoW Specific ---
+# Ignore backup files created by some editors
+*.bak
+*.old
+
+# Ignore WoW's own log files if you run the game while Cursor is open
+*.log
+
+# --- OS Specific ---
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# --- Java/JetBrains (Just in case you used them) ---
+.idea/
+*.iml
+out/
+gen/
