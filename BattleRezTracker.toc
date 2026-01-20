@@ -5,5 +5,5 @@
 ## Version: 1.1.1
 ## SavedVariables: BRT_Settings
 ## IconTexture: Interface\AddOns\BattleRezTracker\Media\BattleRezTracker
-FerrozEditModeLib.lua
+## RequiredDeps: FerrozEditModeLib
 Core.lua
