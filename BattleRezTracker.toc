@@ -1,0 +1,9 @@
+## Interface: 110007, 120000
+## Title: BattleRezTracker
+## Notes: Minimalist battle res icon with timer and charges. Works with Edit Mode.
+## Author: FerrozArgentDawn
+## Version: 1.1.1
+## SavedVariables: BRT_Settings
+## IconTexture: Interface\AddOns\BattleRezTracker\Media\BattleRezTracker
+FerrozEditModeLib.lua
+Core.lua
