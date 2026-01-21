@@ -229,18 +229,21 @@ f:SetScript("OnEvent", function(self, event, ...)
     if event == "ADDON_LOADED" then
         if arg1 == "BattleRezTracker" then
             -- Load Settings
-            FerrozEditModeLib:Register(BattleRezTrackerFrame, BRT_Settings, BRT_OnEnter, BRT_OnExit)
+            FerrozEditModeLib:Register(BattleRezTrackerFrame, BRT_Settings, BRT_OnEnter, BRT_OnExit, nil)
             UpdateDisplay()
-            print("|cFF00FF00[BRT]:|r  Addon Loaded and Registered") 
+            print("|cFF00FF00[BRT]:|r  Addon Loaded and Registered")
+            self:UnregisterEvent("ADDON_LOADED")
         end
     elseif event == "UNIT_SPELLCAST_SUCCEEDED" then
+        local unitTarget = arg1
         local spellID = arg3
         -- Only update if the spell cast was actually a Battle Rez
         if BREZ_SPELL_IDS[spellID] then
-            print("|cFF00FF00[BRT]:|r " .. casterName .. " casted Battle Rez (ID: " .. spellID .. ")")
-            UpdateDisplay()
+            local name = UnitName(unitTarget) or "Someone"
+            print("|cFF00FF00[BRT]:|r " .. name .. " casted Battle Rez (ID: " .. spellID .. ")")
+            --no need to update display, it will update when the charge changes.
         end
     else -- This covers all other events we track
-        UpdateDisplay() 
+        UpdateDisplay()
     end
 end)

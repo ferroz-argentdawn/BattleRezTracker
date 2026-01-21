@@ -6,3 +6,4 @@ ignore:
   - *.code-workspace
   - License.txt
   - README.md
+  - *.ps1
