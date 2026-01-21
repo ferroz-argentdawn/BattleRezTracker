@@ -116,7 +116,7 @@ local function UpdateDisplay()
     if testMode then
         currentCharges = testCount
         duration = testExpirationTime
-        startTime = GetTime() + testExpirationTime
+        startTime = GetTime()
     else 
         chargesTable = C_Spell.GetSpellCharges(20484)
         if chargesTable then
@@ -132,7 +132,8 @@ local function UpdateDisplay()
 
     -- Update the Cooldown Swipe/Timer
     if startTime and duration then
-        f.cd:SetCooldownFromExpirationTime(startTime, duration)
+        --f.cd:SetCooldownFromExpirationTime(startTime, duration)
+        f.cd:SetCooldown(startTime, duration)
         f.cd:SetHideCountdownNumbers(false)
         f.cd:SetCountdownAbbrevThreshold(3600)
     else
