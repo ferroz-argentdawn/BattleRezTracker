@@ -1,0 +1,19 @@
+name: Publish to CurseForge
+
+on:
+  push:
+    branches: [ main ] # This must be indented 2 spaces
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Pack and Ship to CurseForge
+        uses: BigWigsMods/packager@master
+        env:
+          CF_API_KEY: ${{ secrets.CF_API_KEY }}
