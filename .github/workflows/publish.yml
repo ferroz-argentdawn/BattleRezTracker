@@ -2,7 +2,8 @@ name: Publish to CurseForge
 
 on:
   push:
-    branches: [ main ] # This must be indented 2 spaces
+    tags:
+      - 'v*'
 
 jobs:
   release:
