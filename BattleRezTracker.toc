@@ -2,7 +2,7 @@
 ## Title: BattleRezTracker
 ## Notes: Minimalist battle res icon with timer and charges. Works with Edit Mode.
 ## Author: FerrozArgentDawn
-## Version: 1.1.3
+## Version: 1.1.4
 ## SavedVariables: BRT_Settings
 ## IconTexture: Interface\AddOns\BattleRezTracker\Media\BattleRezTracker
 ## RequiredDeps: FerrozEditModeLib

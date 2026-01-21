@@ -35,9 +35,6 @@ f:SetSize(FRAME_SIZE, FRAME_SIZE)
 f:SetPoint("CENTER", UIParent, "CENTER")
 f:SetFrameStrata("MEDIUM")
 f:SetClampedToScreen(true)
-f:SetMovable(true)
-f:EnableMouse(true)
-f:RegisterForDrag("LeftButton")
 
 -- Blue Box Style: Manual Selection Highlight
 f.Selection = f:CreateTexture(nil, "OVERLAY")
