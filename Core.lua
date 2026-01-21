@@ -116,7 +116,7 @@ local function UpdateDisplay()
     if testMode then
         currentCharges = testCount
         duration = testExpirationTime
-        startTime = GetTime() 
+        startTime = GetTime() + testExpirationTime
     else 
         chargesTable = C_Spell.GetSpellCharges(20484)
         if chargesTable then
@@ -127,21 +127,14 @@ local function UpdateDisplay()
     end
     
     if  currentCharges then
-        if f.countText.SetFormattedText then
-            f.countText:SetFormattedText("%d", currentCharges)
-        else
-            f.countText:SetText(currentCharges or "0")
-        end
+        f.countText:SetFormattedText("%d", currentCharges)
     end
 
     -- Update the Cooldown Swipe/Timer
     if startTime and duration then
-        if f.cd.SetCooldownFromExpirationTime then
-            f.cd:SetCooldownFromExpirationTime(startTime, duration)
-        else
-            -- 11.2.7: Live math
-            f.cd:SetCooldown(startTime, duration)
-        end
+        f.cd:SetCooldownFromExpirationTime(startTime, duration)
+        f.cd:SetHideCountdownNumbers(false)
+        f.cd:SetCountdownAbbrevThreshold(3600)
     else
         f.cd:Clear() -- Stops the visual timer
     end
@@ -216,7 +209,6 @@ f:RegisterEvent("PLAYER_ENTERING_WORLD")
 f:RegisterEvent("SPELL_UPDATE_CHARGES")  -- Fires when a charge is used or gained
 f:RegisterEvent("PLAYER_REGEN_DISABLED") -- Entering Combat
 f:RegisterEvent("PLAYER_REGEN_ENABLED")  -- Leaving Combat
-f:RegisterEvent("UNIT_SPELLCAST_SUCCEEDED")
 f:RegisterEvent("ZONE_CHANGED_NEW_AREA") -- Triggered when loading into a dungeon/raid
 f:RegisterEvent("CHALLENGE_MODE_START")  -- Specifically for Mythic+ starts
 f:RegisterEvent("ADDON_LOADED") 
@@ -228,17 +220,9 @@ f:SetScript("OnEvent", function(self, event, ...)
             -- Load Settings
             FerrozEditModeLib:Register(BattleRezTrackerFrame, BRT_Settings, BRT_OnEnter, BRT_OnExit, nil)
             UpdateDisplay()
-            print("|cFF00FF00[BRT]:|r  Addon Loaded and Registered")
+            local version = C_AddOns.GetAddOnMetadata("BattleRezTracker", "Version") or "1.0.0"
+            print("|cFF00FF00[BRT] v" .. version .. ":|r loaded (/brt)")
             self:UnregisterEvent("ADDON_LOADED")
-        end
-    elseif event == "UNIT_SPELLCAST_SUCCEEDED" then
-        local unitTarget = arg1
-        local spellID = arg3
-        -- Only update if the spell cast was actually a Battle Rez
-        if BREZ_SPELL_IDS[spellID] then
-            local name = UnitName(unitTarget) or "Someone"
-            print("|cFF00FF00[BRT]:|r " .. name .. " casted Battle Rez (ID: " .. spellID .. ")")
-            --no need to update display, it will update when the charge changes.
         end
     else -- This covers all other events we track
         UpdateDisplay()
