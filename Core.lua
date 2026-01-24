@@ -30,26 +30,26 @@ local math_max = math.max
 local C_Timer = C_Timer
 
 -- 1. Create the Main Square Frame
-local f = CreateFrame("Frame", "BattleRezTrackerFrame", UIParent)
+local f = CreateFrame("Frame", "BattleRezTrackerFrame", UIParent, "SecureHandlerStateTemplate")
 f:SetSize(FRAME_SIZE, FRAME_SIZE)
 f:SetPoint("CENTER", UIParent, "CENTER")
 f:SetFrameStrata("MEDIUM")
 f:SetClampedToScreen(true)
 
--- Blue Box Style: Manual Selection Highlight
+-- Edit Mode: Manual Selection Highlight
 f.Selection = f:CreateTexture(nil, "OVERLAY")
 f.Selection:SetAllPoints(true)
 f.Selection:SetColorTexture(1, 1, 0, 0.3) -- Yellow highlight
 f.Selection:Hide()
 
--- Blue Box Style: Required Mixin Methods
+-- Edit Mode: Required Mixin Methods
 Mixin(f, EditModeSystemMixin)
 function f:GetSystemName() return "Battle Rez Tracker" end
 function f:SetSelected(selected)
     if selected then self.Selection:Show() else self.Selection:Hide() end
 end
 
--- 2. The Icon (Rebirth)
+--The Icon (Rebirth)
 f.icon = f:CreateTexture(nil, "BACKGROUND")
 f.icon:SetAllPoints(f)
 
@@ -64,7 +64,7 @@ end
 
 f.icon:SetTexCoord(TEXCOORD_LEFT, TEXCOORD_RIGHT, TEXCOORD_LEFT, TEXCOORD_RIGHT)
 
--- 3. The Timer Text (Centered)
+--The Timer Text (Centered)
 f.cd = CreateFrame("Cooldown", nil, f, "CooldownFrameTemplate")
 f.cd:SetDrawSwipe(false)
 f.cd:SetCountdownAbbrevThreshold(3600)
@@ -77,11 +77,10 @@ if cdText and cdText.SetFont then
     cdText:SetTextColor(1, 1, 1)
 end
 
--- 4. The Charge Count (Bottom Right)
+--The Charge Count (Bottom Right)
 f.countText = f:CreateFontString(nil, "OVERLAY", "GameFontHighlightOutline")
 f.countText:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -1, 1)
 f.countText:SetFont(f.countText:GetFont(), COUNT_FONT_SIZE, "OUTLINE")
-
 
 -- boolean whether tracker should be visible
 local function ShouldShowTracker()
@@ -128,6 +127,14 @@ local function UpdateDisplay()
     
     if  currentCharges then
         f.countText:SetFormattedText("%d", currentCharges)
+        if issecretvalue and issecretvalue(currentCharges) then
+            f.icon:SetDesaturated(false )
+        else
+            f.icon:SetDesaturated(currentCharges == 0 )
+        end 
+    else
+        f.countText:SetFormattedText("%d", 0)
+        f.icon:SetDesaturated(true)
     end
 
     -- Update the Cooldown Swipe/Timer
@@ -220,11 +227,12 @@ f:SetScript("OnEvent", function(self, event, ...)
         if arg1 == "BattleRezTracker" then
             -- Load Settings
             FerrozEditModeLib:Register(BattleRezTrackerFrame, BRT_Settings, BRT_OnEnter, BRT_OnExit, nil)
-            UpdateDisplay()
             local version = C_AddOns.GetAddOnMetadata("BattleRezTracker", "Version") or "1.0.0"
             print("|cFF00FF00[BRT] v" .. version .. ":|r loaded (/brt)")
             self:UnregisterEvent("ADDON_LOADED")
         end
+    elseif event ~= "ADDON_LOADED" then
+        UpdateDisplay()
     else -- This covers all other events we track
         UpdateDisplay()
     end
