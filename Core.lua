@@ -23,7 +23,6 @@ local testCount = PREVIEW_CHARGES
 local testExpirationTime = PREVIEW_TIMER  -- 0 = no timer, > 0 = recharging
 
 -- Cache globals for peak performance
-local GetBattleResurrectionDetails = GetBattleResurrectionDetails
 local GetTime = GetTime
 local math_floor = math.floor
 local math_max = math.max
@@ -35,12 +34,6 @@ f:SetSize(FRAME_SIZE, FRAME_SIZE)
 f:SetPoint("CENTER", UIParent, "CENTER")
 f:SetFrameStrata("MEDIUM")
 f:SetClampedToScreen(true)
-
--- Edit Mode: Manual Selection Highlight
-f.Selection = f:CreateTexture(nil, "OVERLAY")
-f.Selection:SetAllPoints(true)
-f.Selection:SetColorTexture(1, 1, 0, 0.3) -- Yellow highlight
-f.Selection:Hide()
 
 -- Edit Mode: Required Mixin Methods
 Mixin(f, EditModeSystemMixin)
@@ -71,11 +64,6 @@ f.cd:SetCountdownAbbrevThreshold(3600)
 f.cd:SetPoint("TOPLEFT", f, "TOPLEFT",0,0)
 f.cd:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT",0,6) 
 f.cd:SetHideCountdownNumbers(false)
-local cdText = f.cd:GetRegions() -- Usually the first region is the text
-if cdText and cdText.SetFont then
-    cdText:SetFont("Fonts\\FRIZQT__.TTF", TIMER_FONT_SIZE, "OUTLINE")
-    cdText:SetTextColor(1, 1, 1)
-end
 
 --The Charge Count (Bottom Right)
 f.countText = f:CreateFontString(nil, "OVERLAY", "GameFontHighlightOutline")
@@ -88,8 +76,6 @@ local function ShouldShowTracker()
     if testMode or (EditModeManagerFrame and EditModeManagerFrame:IsEditModeActive()) then
         return true
     end
-
-    --if InCombatLockdown() then return true end -- Force show if fighting
 
     -- Check if we are in a Raid or Mythic+
     local _, instanceType = GetInstanceInfo()
@@ -131,7 +117,7 @@ local function UpdateDisplay()
             f.icon:SetDesaturated(false )
         else
             f.icon:SetDesaturated(currentCharges == 0 )
-        end 
+        end
     else
         f.countText:SetFormattedText("%d", 0)
         f.icon:SetDesaturated(true)
@@ -170,7 +156,7 @@ SlashCmdList["BATTLEREZTRACKER"] = function(msg)
     cmd = cmd:lower()
     
     if cmd == "reset" then
-        FerrozEditModeLib:ResetPosition(f,BRT_Settings)
+        FerrozEditModeLib:ResetPosition(f)
         UpdateDisplay()
         print("|cFF00FF00[BRT]:|r Position and Scale have been reset.")
     elseif cmd == "test" then
@@ -226,13 +212,11 @@ f:SetScript("OnEvent", function(self, event, ...)
     if event == "ADDON_LOADED" then
         if arg1 == "BattleRezTracker" then
             -- Load Settings
-            FerrozEditModeLib:Register(BattleRezTrackerFrame, BRT_Settings, BRT_OnEnter, BRT_OnExit, nil)
+            FerrozEditModeLib:Register(f, BRT_Settings, BRT_OnEnter, BRT_OnExit)
             local version = C_AddOns.GetAddOnMetadata("BattleRezTracker", "Version") or "1.0.0"
             print("|cFF00FF00[BRT] v" .. version .. ":|r loaded (/brt)")
             self:UnregisterEvent("ADDON_LOADED")
         end
-    elseif event ~= "ADDON_LOADED" then
-        UpdateDisplay()
     else -- This covers all other events we track
         UpdateDisplay()
     end
