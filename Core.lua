@@ -1,5 +1,4 @@
 -- Constants
-BRT_Settings = BRT_Settings or { scale = 1.0 }
 local FRAME_SIZE = 42                    -- Standard action button size
 local REBIRTH_SPELL_ID = 20484           -- SpellID for Rebirth spell icon
 local TEXCOORD_LEFT = 0.08               -- Texture coordinate crop (WeakAura style)
@@ -8,14 +7,8 @@ local COUNT_FONT_SIZE = 12               -- Font size for charge count
 local TIMER_FONT_SIZE = 16               -- Font size for timer text
 local PREVIEW_TIMER = 599                -- Realistic preview timer (10-minute cooldown)
 local PREVIEW_CHARGES = 3              -- Preview charge count for Edit Mode
-local BREZ_SPELL_IDS = {
-    [20484] = true,  -- Rebirth (Druid)
-    [61999] = true,  -- Raise Ally (DK)
-    [20707] = true,  -- Soulstone (Warlock)
-    [199115] = true, -- Failure Detection Pylon (Engineer)
-    [391139] = true, -- Intercession (Paladin)
-}
-
+local FERROZ_COLOR = CreateColorFromHexString("ff8FB8DD")
+local log = FerrozEditModeLib.Log
 
 -- Test mode variables
 local testMode = false
@@ -28,50 +21,13 @@ local math_floor = math.floor
 local math_max = math.max
 local C_Timer = C_Timer
 
--- 1. Create the Main Square Frame
-local f = CreateFrame("Frame", "BattleRezTrackerFrame", UIParent, "SecureHandlerStateTemplate")
-f:SetSize(FRAME_SIZE, FRAME_SIZE)
-f:SetPoint("CENTER", UIParent, "CENTER")
-f:SetFrameStrata("MEDIUM")
-f:SetClampedToScreen(true)
-
--- Edit Mode: Required Mixin Methods
-Mixin(f, EditModeSystemMixin)
-function f:GetSystemName() return "Battle Rez Tracker" end
-function f:SetSelected(selected)
-    if selected then self.Selection:Show() else self.Selection:Hide() end
-end
-
---The Icon (Rebirth)
-f.icon = f:CreateTexture(nil, "BACKGROUND")
-f.icon:SetAllPoints(f)
-
--- Get the icon texture dynamically from the spell data
-local spellInfo = C_Spell.GetSpellInfo(REBIRTH_SPELL_ID)
-if spellInfo then
-    f.icon:SetTexture(spellInfo.iconID)
-else
-    -- Fallback if the spell data isn't ready yet
-    f.icon:SetTexture(136048) 
-end
-
-f.icon:SetTexCoord(TEXCOORD_LEFT, TEXCOORD_RIGHT, TEXCOORD_LEFT, TEXCOORD_RIGHT)
-
---The Timer Text (Centered)
-f.cd = CreateFrame("Cooldown", nil, f, "CooldownFrameTemplate")
-f.cd:SetDrawSwipe(false)
-f.cd:SetCountdownAbbrevThreshold(3600)
-f.cd:SetPoint("TOPLEFT", f, "TOPLEFT",0,0)
-f.cd:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT",0,6) 
-f.cd:SetHideCountdownNumbers(false)
-
---The Charge Count (Bottom Right)
-f.countText = f:CreateFontString(nil, "OVERLAY", "GameFontHighlightOutline")
-f.countText:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -1, 1)
-f.countText:SetFont(f.countText:GetFont(), COUNT_FONT_SIZE, "OUTLINE")
+---------------------------------------------------------
+-- MIXINS 
+---------------------------------------------------------
+BattleRezTracker_Mixin = {}
 
 -- boolean whether tracker should be visible
-local function ShouldShowTracker()
+function BattleRezTracker_Mixin:ShouldShowTracker()
     -- Always show in Edit Mode or Test Mode
     if testMode or (EditModeManagerFrame and EditModeManagerFrame:IsEditModeActive()) then
         return true
@@ -85,14 +41,14 @@ local function ShouldShowTracker()
     return (instanceType == "raid") or isMythicPlus or (instanceType == "scenario")
 end
 --updates display when something changes
-local function UpdateDisplay()
+function BattleRezTracker_Mixin:UpdateDisplay()
     -- Preview behavior for Edit Mode
     if EditModeManagerFrame and EditModeManagerFrame:IsEditModeActive() then
         return
     end
 
-    if not ShouldShowTracker() then
-        f:Hide()
+    if not self:ShouldShowTracker() then
+        self:SetAlpha(0)
         return
     end
 
@@ -112,40 +68,94 @@ local function UpdateDisplay()
     end
     
     if  currentCharges then
-        f.countText:SetFormattedText("%d", currentCharges)
+        self.countText:SetFormattedText("%d", currentCharges)
         if issecretvalue and issecretvalue(currentCharges) then
-            f.icon:SetDesaturated(false )
+            self.icon:SetDesaturated(false )
         else
-            f.icon:SetDesaturated(currentCharges == 0 )
+            self.icon:SetDesaturated(currentCharges == 0 )
         end
     else
-        f.countText:SetFormattedText("%d", 0)
-        f.icon:SetDesaturated(true)
+        self.countText:SetFormattedText("%d", 0)
+        self.icon:SetDesaturated(true)
     end
 
     -- Update the Cooldown Swipe/Timer
     if startTime and duration then
-        --f.cd:SetCooldownFromExpirationTime(startTime, duration)
-        f.cd:SetCooldown(startTime, duration)
-        f.cd:SetHideCountdownNumbers(false)
-        f.cd:SetCountdownAbbrevThreshold(3600)
+        --self.cd:SetCooldownFromExpirationTime(startTime, duration)
+        self.cd:SetCooldown(startTime, duration)
+        self.cd:SetHideCountdownNumbers(false)
+        self.cd:SetCountdownAbbrevThreshold(3600)
     else
-        f.cd:Clear() -- Stops the visual timer
+        self.cd:Clear() -- Stops the visual timer
     end
 
-    f:Show()
+    self:SetAlpha(1)
 end
 
-local function BRT_OnEnter(frame)
-    frame.countText:SetText(PREVIEW_CHARGES)
-    frame.cd:SetCooldown(GetTime(), PREVIEW_TIMER)
-    frame.icon:SetDesaturated(false)
-    frame:Show()
+function BattleRezTracker_Mixin:EditModeStartMock()
+    self.countText:SetText(PREVIEW_CHARGES)
+    self.cd:SetCooldown(GetTime(), PREVIEW_TIMER)
+    self.icon:SetDesaturated(false)
+    self:SetAlpha(1)
 end
 
-local function BRT_OnExit(frame)
-    frame.cd:Clear()
-    UpdateDisplay() -- Returns to real combat data
+function BattleRezTracker_Mixin:EditModeStopMock()
+    self.cd:Clear()
+    self:UpdateDisplay() -- Returns to real combat data
+end
+
+local function InitializeBattleRezTracker()
+    -- 1. Create the Main Square Frame
+    local f = CreateFrame("Frame", "BattleRezTracker", UIParent, "SecureHandlerStateTemplate")
+    Mixin(f, BattleRezTracker_Mixin)
+    f:SetSize(FRAME_SIZE, FRAME_SIZE)
+    f:SetPoint("CENTER", UIParent, "CENTER")
+    f:SetFrameStrata("MEDIUM")
+    f:SetClampedToScreen(true)
+
+    --The Icon (Rebirth)
+    f.icon = f:CreateTexture(nil, "BACKGROUND")
+    f.icon:SetAllPoints(f)
+
+    -- Get the icon texture dynamically from the spell data
+    local spellInfo = C_Spell.GetSpellInfo(REBIRTH_SPELL_ID)
+    if spellInfo then
+        f.icon:SetTexture(spellInfo.iconID)
+    else
+        -- Fallback if the spell data isn't ready yet
+        f.icon:SetTexture(136048) 
+    end
+
+    f.icon:SetTexCoord(TEXCOORD_LEFT, TEXCOORD_RIGHT, TEXCOORD_LEFT, TEXCOORD_RIGHT)
+
+    --The Timer Text (Centered)
+    f.cd = CreateFrame("Cooldown", nil, f, "CooldownFrameTemplate")
+    f.cd:SetDrawSwipe(false)
+    f.cd:SetCountdownAbbrevThreshold(3600)
+    f.cd:SetPoint("TOPLEFT", f, "TOPLEFT",0,0)
+    f.cd:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT",0,6) 
+    f.cd:SetHideCountdownNumbers(false)
+
+    --The Charge Count (Bottom Right)
+    f.countText = f:CreateFontString(nil, "OVERLAY", "GameFontHighlightOutline")
+    f.countText:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -1, 1)
+    f.countText:SetFont(f.countText:GetFont(), COUNT_FONT_SIZE, "OUTLINE")
+
+    if FerrozEditModeLib then
+        FerrozEditModeLib:Register(f, BRT_Settings)
+    end
+
+    --Event Handling
+    f:RegisterEvent("PLAYER_ENTERING_WORLD") 
+    f:RegisterEvent("SPELL_UPDATE_CHARGES")  -- Fires when a charge is used or gained
+    f:RegisterEvent("PLAYER_REGEN_DISABLED") -- Entering Combat
+    f:RegisterEvent("PLAYER_REGEN_ENABLED")  -- Leaving Combat
+    f:RegisterEvent("ZONE_CHANGED_NEW_AREA") -- Triggered when loading into a dungeon/raid
+    f:RegisterEvent("CHALLENGE_MODE_START")  -- Specifically for Mythic+ starts
+
+    f:SetScript("OnEvent", function(self, event)
+        self:UpdateDisplay()
+    end)
 end
 
 -- Slash commands for testing
@@ -156,68 +166,54 @@ SlashCmdList["BATTLEREZTRACKER"] = function(msg)
     cmd = cmd:lower()
     
     if cmd == "reset" then
-        FerrozEditModeLib:ResetPosition(f)
-        UpdateDisplay()
-        print("|cFF00FF00[BRT]:|r Position and Scale have been reset.")
+        if(BattleRezTracker) then log("null") else log("there") end
+        FerrozEditModeLib:ResetPosition(BattleRezTracker)
+        BattleRezTracker:UpdateDisplay()
+        print(FERROZ_COLOR:WrapTextInColorCode("[BRT]:").." Position and Scale have been reset.")
     elseif cmd == "test" then
         testMode = not testMode
         local status = testMode and "ENABLED" or "DISABLED"
-        print(string.format("|cFF00FF00[BRT]:|r Test mode %s", status))
+        print(string.format(FERROZ_COLOR:WrapTextInColorCode("[BRT]:").." Test mode %s", status))
         if testMode then
-            print("|cFF00FF00[BRT]:|r Use /brt count # to set test charges")
-            print("|cFF00FF00[BRT]:|r Use /brt timer # to set test timer (seconds, 0 to clear)")
+            print(FERROZ_COLOR:WrapTextInColorCode("[BRT]:").." Use /brt count # to set test charges")
+            print(FERROZ_COLOR:WrapTextInColorCode("[BRT]:").." Use /brt timer # to set test timer (seconds, 0 to clear)")
         end
-        UpdateDisplay()
+        BattleRezTracker:UpdateDisplay()
     elseif cmd == "refresh" then
         print("force refresh")
-        UpdateDisplay()
+        BattleRezTracker:UpdateDisplay()
     elseif cmd == "count" and tonumber(arg) then
         testCount = math_max(0, tonumber(arg))
-        print(string.format("|cFF00FF00[BRT]:|r Test charges set to %d", testCount))
+        print(string.format(FERROZ_COLOR:WrapTextInColorCode("[BRT]:").." Test charges set to %d", testCount))
         if testMode then
-            UpdateDisplay()
+            BattleRezTracker:UpdateDisplay()
         end
     elseif cmd == "timer" and tonumber(arg) then
         local seconds = tonumber(arg)
         testExpirationTime = math_max(0, seconds)
         if testExpirationTime > 0 then
-            print(string.format("|cFF00FF00[BRT]:|r Test timer set to %d seconds", testExpirationTime))
+            print(string.format(FERROZ_COLOR:WrapTextInColorCode("[BRT]:").." Test timer set to %d seconds", testExpirationTime))
         else
-            print("|cFF00FF00[BRT]:|r Test timer cleared")
+            print(FERROZ_COLOR:WrapTextInColorCode("[BRT]:").." Test timer cleared")
         end
         if testMode then
-            UpdateDisplay()
+            BattleRezTracker:UpdateDisplay()
         end
     else
-        print("|cFF00FF00[BRT] Commands:|r")
+        print(FERROZ_COLOR:WrapTextInColorCode("Battle Rez Tracker Commands:"))
         print("  /brt reset - Reset position to center and scale to 1.0")
         print("  /brt test - Toggle test mode (simulates battle rez data)")
         print("  /brt count # - Set test charge count (e.g., /brt count 2)")
         print("  /brt timer # - Set test timer in seconds (e.g., /brt timer 300 for 5 min, 0 to clear)")
-        UpdateDisplay()
+        BattleRezTracker:UpdateDisplay()
     end
 end
 
---Event Handling
-f:RegisterEvent("PLAYER_ENTERING_WORLD") 
-f:RegisterEvent("SPELL_UPDATE_CHARGES")  -- Fires when a charge is used or gained
-f:RegisterEvent("PLAYER_REGEN_DISABLED") -- Entering Combat
-f:RegisterEvent("PLAYER_REGEN_ENABLED")  -- Leaving Combat
-f:RegisterEvent("ZONE_CHANGED_NEW_AREA") -- Triggered when loading into a dungeon/raid
-f:RegisterEvent("CHALLENGE_MODE_START")  -- Specifically for Mythic+ starts
-f:RegisterEvent("ADDON_LOADED") 
-
-f:SetScript("OnEvent", function(self, event, ...)
-    local arg1, arg2, arg3 = ... -- Capture arguments generically
-    if event == "ADDON_LOADED" then
-        if arg1 == "BattleRezTracker" then
-            -- Load Settings
-            FerrozEditModeLib:Register(f, BRT_Settings, BRT_OnEnter, BRT_OnExit)
-            local version = C_AddOns.GetAddOnMetadata("BattleRezTracker", "Version") or "1.0.0"
-            print("|cFF00FF00[BRT] v" .. version .. ":|r loaded (/brt)")
-            self:UnregisterEvent("ADDON_LOADED")
-        end
-    else -- This covers all other events we track
-        UpdateDisplay()
+local loader = CreateFrame("Frame")
+loader:RegisterEvent("ADDON_LOADED")
+loader:SetScript("OnEvent", function(self, event, name)
+    if name == "Co_Tank_Frame" then
+        InitializeBattleRezTracker()
+        self:UnregisterEvent("ADDON_LOADED")
     end
 end)
