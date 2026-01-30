@@ -1,3 +1,6 @@
+local addonName, ns = ...
+---Libraries
+local lib = LibStub("FerrozEditModeLib-1.0")
 -- Constants
 local FRAME_SIZE = 42                    -- Standard action button size
 local REBIRTH_SPELL_ID = 20484           -- SpellID for Rebirth spell icon
@@ -8,7 +11,7 @@ local TIMER_FONT_SIZE = 16               -- Font size for timer text
 local PREVIEW_TIMER = 599                -- Realistic preview timer (10-minute cooldown)
 local PREVIEW_CHARGES = 3              -- Preview charge count for Edit Mode
 local FERROZ_COLOR = CreateColorFromHexString("ff8FB8DD")
-local log = FerrozEditModeLib.Log
+local log = lib.Log
 
 -- Test mode variables
 local testMode = false
@@ -123,13 +126,14 @@ local function InitializeBattleRezTracker()
         f.icon:SetTexture(spellInfo.iconID)
     else
         -- Fallback if the spell data isn't ready yet
-        f.icon:SetTexture(136048) 
+        f.icon:SetTexture(136048)
     end
 
     f.icon:SetTexCoord(TEXCOORD_LEFT, TEXCOORD_RIGHT, TEXCOORD_LEFT, TEXCOORD_RIGHT)
 
     --The Timer Text (Centered)
     f.cd = CreateFrame("Cooldown", nil, f, "CooldownFrameTemplate")
+    f.cd:SetFrameLevel(f:GetFrameLevel() + 1)
     f.cd:SetDrawSwipe(false)
     f.cd:SetCountdownAbbrevThreshold(3600)
     f.cd:SetPoint("TOPLEFT", f, "TOPLEFT",0,0)
@@ -141,9 +145,12 @@ local function InitializeBattleRezTracker()
     f.countText:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -1, 1)
     f.countText:SetFont(f.countText:GetFont(), COUNT_FONT_SIZE, "OUTLINE")
 
-    if FerrozEditModeLib then
-        FerrozEditModeLib:Register(f, BRT_Settings)
+    if lib then
+        lib:Register(f, BRT_Settings)
     end
+
+    local version = C_AddOns.GetAddOnMetadata(addonName, "Version") or "1.0.0"
+    print(FERROZ_COLOR:WrapTextInColorCode("[BattleRezTracker] v" .. version) .. " loaded (/brt)")
 
     --Event Handling
     f:RegisterEvent("PLAYER_ENTERING_WORLD") 
@@ -166,8 +173,7 @@ SlashCmdList["BATTLEREZTRACKER"] = function(msg)
     cmd = cmd:lower()
     
     if cmd == "reset" then
-        if(BattleRezTracker) then log("null") else log("there") end
-        FerrozEditModeLib:ResetPosition(BattleRezTracker)
+        lib:ResetPosition(BattleRezTracker)
         BattleRezTracker:UpdateDisplay()
         print(FERROZ_COLOR:WrapTextInColorCode("[BRT]:").." Position and Scale have been reset.")
     elseif cmd == "test" then
@@ -212,7 +218,7 @@ end
 local loader = CreateFrame("Frame")
 loader:RegisterEvent("ADDON_LOADED")
 loader:SetScript("OnEvent", function(self, event, name)
-    if name == "Co_Tank_Frame" then
+    if name == addonName then
         InitializeBattleRezTracker()
         self:UnregisterEvent("ADDON_LOADED")
     end
