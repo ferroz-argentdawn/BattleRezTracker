@@ -12,7 +12,13 @@ local PREVIEW_TIMER = 599                -- Realistic preview timer (10-minute c
 local PREVIEW_CHARGES = 3              -- Preview charge count for Edit Mode
 local FERROZ_COLOR = CreateColorFromHexString("ff8FB8DD")
 local log = lib.Log
+local DEFAULT_STATE = {
+    height=FRAME_SIZE,
+    width=FRAME_SIZE
+}
 
+-- show mode boolean
+local showMode = false
 -- Test mode variables
 local testMode = false
 local testCount = PREVIEW_CHARGES
@@ -27,14 +33,12 @@ local C_Timer = C_Timer
 ---------------------------------------------------------
 -- MIXINS 
 ---------------------------------------------------------
-BattleRezTracker_Mixin = {}
+BRT_Mixin = {}
 
 -- boolean whether tracker should be visible
-function BattleRezTracker_Mixin:ShouldShowTracker()
+function BRT_Mixin:ShouldShowTracker()
     -- Always show in Edit Mode or Test Mode
-    if testMode or (EditModeManagerFrame and EditModeManagerFrame:IsEditModeActive()) then
-        return true
-    end
+    if showMode or testMode or self.isEditing then return true end
 
     -- Check if we are in a Raid or Mythic+
     local _, instanceType = GetInstanceInfo()
@@ -43,20 +47,24 @@ function BattleRezTracker_Mixin:ShouldShowTracker()
     -- Return true if in Raid, Mythic+, or a Delve
     return (instanceType == "raid") or isMythicPlus or (instanceType == "scenario")
 end
+--updates visibility, only happens outside of comat
+function BRT_Mixin:UpdateZoneVisibility()
+    if InCombatLockdown() then return end
+    if not self:ShouldShowTracker() then
+        self:Hide()
+    else
+        self:Show()
+    end
+end
 --updates display when something changes
-function BattleRezTracker_Mixin:UpdateDisplay()
+function BRT_Mixin:UpdateDisplay()
     -- Preview behavior for Edit Mode
     if EditModeManagerFrame and EditModeManagerFrame:IsEditModeActive() then
         return
     end
 
-    if not self:ShouldShowTracker() then
-        self:SetAlpha(0)
-        return
-    end
-
     -- Test mode: use simulated data
-    local chargesTable, currentCharges, startTime, duration
+    local chargesTable, currentCharges, startTime, duration = nil,0,0,0
     if testMode then
         currentCharges = testCount
         duration = testExpirationTime
@@ -64,22 +72,18 @@ function BattleRezTracker_Mixin:UpdateDisplay()
     else 
         chargesTable = C_Spell.GetSpellCharges(20484)
         if chargesTable then
-            currentCharges = chargesTable.currentCharges
-            startTime = chargesTable.cooldownStartTime
-            duration = chargesTable.cooldownDuration
+            currentCharges = chargesTable.currentCharges or 0
+            startTime = chargesTable.cooldownStartTime or 0
+            duration = chargesTable.cooldownDuration or 0
         end
     end
     
     if  currentCharges then
         self.countText:SetFormattedText("%d", currentCharges)
-        if issecretvalue and issecretvalue(currentCharges) then
-            self.icon:SetDesaturated(false )
-        else
-            self.icon:SetDesaturated(currentCharges == 0 )
-        end
+        --don't changes visuals (alpha/saturation) to avoid taint
     else
         self.countText:SetFormattedText("%d", 0)
-        self.icon:SetDesaturated(true)
+        --don't changes visuals (alpha/saturation) to avoid taint
     end
 
     -- Update the Cooldown Swipe/Timer
@@ -91,35 +95,34 @@ function BattleRezTracker_Mixin:UpdateDisplay()
     else
         self.cd:Clear() -- Stops the visual timer
     end
-
-    self:SetAlpha(1)
 end
 
-function BattleRezTracker_Mixin:EditModeStartMock()
+function BRT_Mixin:EditModeStartMock()
     self.countText:SetText(PREVIEW_CHARGES)
     self.cd:SetCooldown(GetTime(), PREVIEW_TIMER)
-    self.icon:SetDesaturated(false)
-    self:SetAlpha(1)
+    self:UpdateZoneVisibility()
 end
 
-function BattleRezTracker_Mixin:EditModeStopMock()
+function BRT_Mixin:EditModeStopMock()
     self.cd:Clear()
+    self:UpdateZoneVisibility()
     self:UpdateDisplay() -- Returns to real combat data
 end
 
 local function InitializeBattleRezTracker()
-    -- 1. Create the Main Square Frame
+    BRT_Settings = BRT_Settings or {}
+    BRT_Settings.layouts = BRT_Settings.layouts or {}
+    --Create Frame
     local f = CreateFrame("Frame", "BattleRezTracker", UIParent, "SecureHandlerStateTemplate")
-    Mixin(f, BattleRezTracker_Mixin)
+    Mixin(f, BRT_Mixin)
     f:SetSize(FRAME_SIZE, FRAME_SIZE)
     f:SetPoint("CENTER", UIParent, "CENTER")
     f:SetFrameStrata("MEDIUM")
     f:SetClampedToScreen(true)
 
-    --The Icon (Rebirth)
+    --Icon (Rebirth)
     f.icon = f:CreateTexture(nil, "BACKGROUND")
     f.icon:SetAllPoints(f)
-
     -- Get the icon texture dynamically from the spell data
     local spellInfo = C_Spell.GetSpellInfo(REBIRTH_SPELL_ID)
     if spellInfo then
@@ -128,25 +131,24 @@ local function InitializeBattleRezTracker()
         -- Fallback if the spell data isn't ready yet
         f.icon:SetTexture(136048)
     end
-
     f.icon:SetTexCoord(TEXCOORD_LEFT, TEXCOORD_RIGHT, TEXCOORD_LEFT, TEXCOORD_RIGHT)
 
-    --The Timer Text (Centered)
+    --Timer Text (Centered)
     f.cd = CreateFrame("Cooldown", nil, f, "CooldownFrameTemplate")
     f.cd:SetFrameLevel(f:GetFrameLevel() + 1)
     f.cd:SetDrawSwipe(false)
     f.cd:SetCountdownAbbrevThreshold(3600)
     f.cd:SetPoint("TOPLEFT", f, "TOPLEFT",0,0)
-    f.cd:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT",0,6) 
+    f.cd:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT",0,6)
     f.cd:SetHideCountdownNumbers(false)
 
-    --The Charge Count (Bottom Right)
+    --Charge Count (Bottom Right)
     f.countText = f:CreateFontString(nil, "OVERLAY", "GameFontHighlightOutline")
     f.countText:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -1, 1)
     f.countText:SetFont(f.countText:GetFont(), COUNT_FONT_SIZE, "OUTLINE")
 
     if lib then
-        lib:Register(f, BRT_Settings)
+        lib:Register(f, BRT_Settings,DEFAULT_STATE)
     end
 
     local version = C_AddOns.GetAddOnMetadata(addonName, "Version") or "1.0.0"
@@ -162,6 +164,28 @@ local function InitializeBattleRezTracker()
 
     f:SetScript("OnEvent", function(self, event)
         self:UpdateDisplay()
+    end)
+
+    --initial values for full and dimmed states
+    f:SetAttribute("alpha-full", 1.0)
+    f:SetAlpha(0.5)
+
+    --handle setting alpha in combat taint free
+    RegisterStateDriver(f, "rez-alpha", "[combat] active; inactive")
+    f:SetAttribute("_onstate-rez-alpha", [[ 
+        local activeAlpha = self:GetAttribute("alpha-full") or 1
+        local inactiveAlpha = activeAlpha / 2
+        self:SetAlpha(newstate == "active" and activeAlpha or inactiveAlpha)
+    ]])
+
+
+    f.zoneVisibilityManager = CreateFrame("Frame")
+    f.zoneVisibilityManager:RegisterEvent("PLAYER_ENTERING_WORLD") 
+    f.zoneVisibilityManager:RegisterEvent("PLAYER_REGEN_ENABLED")  -- Leaving Combat
+    f.zoneVisibilityManager:RegisterEvent("ZONE_CHANGED_NEW_AREA") -- Triggered when loading into a dungeon/raid
+    f.zoneVisibilityManager:RegisterEvent("CHALLENGE_MODE_START")  -- Specifically for Mythic+ starts
+    f.zoneVisibilityManager:SetScript("OnEvent", function(self, event)
+        f:UpdateZoneVisibility()
     end)
 end
 
@@ -184,6 +208,13 @@ SlashCmdList["BATTLEREZTRACKER"] = function(msg)
             print(FERROZ_COLOR:WrapTextInColorCode("[BRT]:").." Use /brt count # to set test charges")
             print(FERROZ_COLOR:WrapTextInColorCode("[BRT]:").." Use /brt timer # to set test timer (seconds, 0 to clear)")
         end
+        BattleRezTracker:UpdateZoneVisibility()
+        BattleRezTracker:UpdateDisplay()
+    elseif cmd == "show" then
+        showMode = not showMode
+        local status = showMode and "ENABLED" or "DISABLED"
+        print(string.format(FERROZ_COLOR:WrapTextInColorCode("[BRT]:").." Show mode %s", status))
+        BattleRezTracker:UpdateZoneVisibility()
         BattleRezTracker:UpdateDisplay()
     elseif cmd == "refresh" then
         print("force refresh")
@@ -208,6 +239,7 @@ SlashCmdList["BATTLEREZTRACKER"] = function(msg)
     else
         print(FERROZ_COLOR:WrapTextInColorCode("Battle Rez Tracker Commands:"))
         print("  /brt reset - Reset position to center and scale to 1.0")
+        print("  /brt show - Toggle show mode (shows even when not in M+ or raid)")
         print("  /brt test - Toggle test mode (simulates battle rez data)")
         print("  /brt count # - Set test charge count (e.g., /brt count 2)")
         print("  /brt timer # - Set test timer in seconds (e.g., /brt timer 300 for 5 min, 0 to clear)")
