@@ -105,10 +105,8 @@ function BRT_Mixin:UpdateDisplay()
 
     -- Update the Cooldown Swipe/Timer
     if startTime and duration then
-        --self.cd:SetCooldownFromExpirationTime(startTime, duration)
         self.cd:SetCooldown(startTime, duration)
         self.cd:SetHideCountdownNumbers(false)
-        self.cd:SetCountdownAbbrevThreshold(3600)
     else
         self.cd:Clear() -- Stops the visual timer
     end
@@ -202,10 +200,11 @@ local function InitializeBattleRezTracker()
     f.cd = CreateFrame("Cooldown", nil, f, "CooldownFrameTemplate")
     f.cd:SetFrameLevel(f:GetFrameLevel() + 1)
     f.cd:SetDrawSwipe(false)
-    f.cd:SetCountdownAbbrevThreshold(3600)
     f.cd:SetPoint("TOPLEFT", f, "TOPLEFT",0,0)
     f.cd:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT",0,6)
     f.cd:SetHideCountdownNumbers(false)
+    f.cd:SetUseAuraDisplayTime(true)
+    f.cd:SetCountdownAbbrevThreshold(600)
 
     --Charge Count (Bottom Right)
     f.countText = f:CreateFontString(nil, "OVERLAY", "GameFontHighlightOutline")
