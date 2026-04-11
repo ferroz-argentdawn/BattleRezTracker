@@ -230,7 +230,6 @@ local function InitializeBattleRezTracker()
 
     --initial values for full and dimmed states
     f:SetAttribute("alpha-full", 1.0)
-    f:SetAlpha(0.5)
 
     --handle setting alpha in combat taint free
     RegisterStateDriver(f, "rez-alpha", "[combat] active; inactive")
